@@ -7,11 +7,11 @@ from torch.utils.data import random_split
 import torch.nn.functional as F
 
 sample_rate = 8000
-chunk_size = 1.2 * sample_rate
-clipped_chunk_size = 1.0 * sample_rate
+chunk_size = int(1.2 * sample_rate)
+clipped_chunk_size = int(1.0 * sample_rate)
 length = 30
 chunk_overlap = 0.5
-chunks_per_song = length * sample_rate // chunk_overlap
+chunks_per_song = int(length // chunk_overlap)
 
 
 class FingerprintDataset(Dataset):
@@ -29,30 +29,37 @@ class FingerprintDataset(Dataset):
         return len(self.files) * chunks_per_song
 
     def __getitem__(self, idx):
-        song_id = idx // (chunks_per_song)
-        chunk_id = idx % (chunks_per_song)
-        data, sr = torchaudio.load(song_id)
+        song_id = int(idx // (chunks_per_song))
+        chunk_id = int(idx % (chunks_per_song))
+        data, sr = torchaudio.load(self.files[song_id])
         data = torchaudio.functional.resample(data, sr, sample_rate)
-        chunk = data[
-            :, chunk_id * chunk_overlap : (chunk_id * chunk_overlap) + chunk_size
-        ]
+        start = int(chunk_id * chunk_overlap * sample_rate)
+        chunk = data[:, start : start + chunk_size]
         # Sum to mono
         if chunk.shape[0] > 1:
             chunk = torch.sum(chunk, dim=0, keepdim=True)
+        if chunk.shape[1] < chunk_size:
+            chunk = F.pad(chunk, (0, chunk_size - chunk.shape[1]))
 
         # pick random 1s portion
         start1 = torch.randint(0, chunk.shape[1] - clipped_chunk_size, (1,))
         start2 = torch.randint(0, chunk.shape[1] - clipped_chunk_size, (1,))
         x_org = chunk[:, start1 : start1 + clipped_chunk_size]
         x_rep = chunk[:, start2 : start2 + clipped_chunk_size]
+
         # TD Augmentations
         # Background mixing
         # IR Filter
         # Spectrogram
-        X_org = self.mel(x_org)
-        X_rep = self.mel(x_rep)
+        X_org = self.mel(x_org)  # C x F x T
+        X_rep = self.mel(x_rep)  # C x F x T
         # Spectrogram Augmentations
-
+        msk = torch.zeros(
+            (int(round(X_rep.shape[1] / 2)), int(round(X_rep.shape[2] / 10)))
+        )
+        msk_x = torch.randint(0, X_rep.shape[1] - msk.shape[0], (1,))
+        msk_y = torch.randint(0, X_rep.shape[2] - msk.shape[1], (1,))
+        X_rep[:, msk_x : msk_x + msk.shape[0], msk_y : msk_y + msk.shape[1]] = msk
         return X_org, X_rep
 
 

@@ -4,10 +4,10 @@ from fingerprint.model import FingerprinterModel
 
 
 def main():
-    model = FingerprinterModel()
-    dataset = FingerprintDataset("sss_free")
+    dataset = FingerprintDataset("data/database_recordings", 16)
     batch_size = 32
     data = FingerprintDataModule(dataset, batch_size)
+    model = FingerprinterModel()
 
     trainer = pl.Trainer(max_epochs=10, accelerator="cpu")
     trainer.fit(model, data)

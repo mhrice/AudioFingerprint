@@ -39,14 +39,14 @@ class FingerprinterModel(pl.LightningModule):
 class FingerprinterEncoder(nn.Module):
     def __init__(self, dim=64, h=1024):
         super().__init__()
-        self.conv1 = SpatiallySeparableConvBlock(1, dim, 3, stride=2)
-        self.conv2 = SpatiallySeparableConvBlock(dim, dim, 3, stride=2)
-        self.conv3 = SpatiallySeparableConvBlock(dim, 2 * dim, 3, stride=2)
-        self.conv4 = SpatiallySeparableConvBlock(2 * dim, 2 * dim, 3, stride=2)
-        self.conv5 = SpatiallySeparableConvBlock(2 * dim, 4 * dim, 3, stride=2)
-        self.conv6 = SpatiallySeparableConvBlock(4 * dim, 4 * dim, 3, stride=2)
-        self.conv7 = SpatiallySeparableConvBlock(4 * dim, h, 3, stride=2)
-        self.conv8 = SpatiallySeparableConvBlock(h, h, 3, stride=2)
+        self.conv1 = SpatiallySeparableConvBlock(1, dim, 3, 2, 256, 32)
+        self.conv2 = SpatiallySeparableConvBlock(dim, dim, 3, 2, 128, 16)
+        self.conv3 = SpatiallySeparableConvBlock(dim, 2 * dim, 3, 2, 64, 8)
+        self.conv4 = SpatiallySeparableConvBlock(2 * dim, 2 * dim, 3, 2, 32, 4)
+        self.conv5 = SpatiallySeparableConvBlock(2 * dim, 4 * dim, 3, 2, 16, 2)
+        self.conv6 = SpatiallySeparableConvBlock(4 * dim, 4 * dim, 3, 2, 8, 1)
+        self.conv7 = SpatiallySeparableConvBlock(4 * dim, h, 3, 2, 4, 1)
+        self.conv8 = SpatiallySeparableConvBlock(h, h, 3, 2, 2, 1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -63,40 +63,46 @@ class FingerprinterEncoder(nn.Module):
 class FingerprinterProjection(nn.Module):
     def __init__(self, dim=64, h=1024):
         super().__init__()
-        self.conv1 = nn.Conv2d(h / dim, 32, 1)
+        self.conv1 = nn.Conv2d(h // dim, 32, 1)
         self.elu = nn.ELU()
         self.conv2 = nn.Conv2d(32, 1, 1)
+        self.split_size = h // dim
 
     def forward(self, x):
+        # split
+        x = torch.stack(torch.split(x, self.split_size, dim=1), dim=2)
+        x = x.unsqueeze(-1)
         x = self.conv1(x)
         x = self.elu(x)
         x = self.conv2(x)
-        c = torch.stack([x, x], dim=1)
+        c = x.squeeze(1).squeeze(-1)
         g = torch.linalg.norm(c, dim=1, ord=2, keepdim=True)
         return g
 
 
 class SpatiallySeparableConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, f, t):
         super().__init__()
         self.conv1 = nn.Conv2d(
             in_channels,
             out_channels,
-            kernel_size,
-            stride=stride,
-            padding=kernel_size // 2,
+            (1, kernel_size),
+            stride=(1, stride),
+            padding=(0, kernel_size // 2),
         )
-        self.layer_norm1 = nn.LayerNorm(out_channels)
+        self.layer_norm1 = nn.LayerNorm((out_channels, f, (t - 1) // stride + 1))
         self.relu = nn.ReLU()
 
         self.conv2 = nn.Conv2d(
-            in_channels,
             out_channels,
-            kernel_size,
-            stride=stride,
-            padding=kernel_size // 2,
+            out_channels,
+            (kernel_size, 1),
+            stride=(stride, 1),
+            padding=(kernel_size // 2, 0),
         )
-        self.layer_norm2 = nn.LayerNorm(out_channels)
+        self.layer_norm2 = nn.LayerNorm(
+            (out_channels, (f - 1) // stride + 1, (t - 1) // stride + 1)
+        )
 
     def forward(self, x):
         x = self.relu(self.layer_norm1(self.conv1(x)))
