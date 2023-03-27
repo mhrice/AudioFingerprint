@@ -15,10 +15,14 @@ chunks_per_song = int(length // chunk_overlap)
 
 
 class FingerprintDataset(Dataset):
-    def __init__(self, data_dir, batch_size, anchors_per_batch=8):
+    def __init__(self, data_dir, noise_dir, ir_dir, batch_size, anchors_per_batch=8):
         super().__init__()
         self.root = Path(data_dir)
         self.files = list(self.root.glob("*.wav"))
+        self.noise_dir = Path(noise_dir) / "audio"
+        self.noise_files = list(self.noise_dir.glob("*.wav"))
+        self.ir_dir = Path(ir_dir)
+        self.ir_files = list(self.ir_dir.glob("*.wav"))
         shuffle_indices = torch.randperm(len(self.files))
         self.files = [self.files[i] for i in shuffle_indices]
         self.mel = torchaudio.transforms.MelSpectrogram(
@@ -49,11 +53,31 @@ class FingerprintDataset(Dataset):
 
         # TD Augmentations
         # Background mixing
+        noise_file = self.noise_files[torch.randint(0, len(self.noise_files), (1,))]
+        noise, sr = torchaudio.load(noise_file)
+        noise = torchaudio.functional.resample(noise, sr, sample_rate)
+        if noise.shape[0] > 1:
+            noise = torch.sum(noise, dim=0, keepdim=True)
+        if noise.shape[1] < chunk_size:
+            noise = F.pad(noise, (0, chunk_size - noise.shape[1]))
+        random_noise_start = torch.randint(0, noise.shape[1] - clipped_chunk_size, (1,))
+        noise = noise[:, random_noise_start : random_noise_start + clipped_chunk_size]
+        x_rep = x_rep + noise
         # IR Filter
+        ir_file = self.ir_files[torch.randint(0, len(self.ir_files), (1,))]
+        ir, sr = torchaudio.load(ir_file)
+        ir = torchaudio.functional.resample(ir, sr, sample_rate)
+        if ir.shape[0] > 1:
+            ir = torch.sum(ir, dim=0, keepdim=True)
+        # Convolve
+        fftLength = x_rep.shape[1]
+        X = torch.fft.fft(x_rep, n=fftLength)
+        X_ir = torch.fft.fft(ir, n=fftLength)
+        x_rep = torch.fft.ifft(X_ir * X)[:fftLength].real
         # Spectrogram
         X_org = self.mel(x_org)  # C x F x T
         X_rep = self.mel(x_rep)  # C x F x T
-        # Spectrogram Augmentations
+        # Spectrogram Masking
         msk = torch.zeros(
             (int(round(X_rep.shape[1] / 2)), int(round(X_rep.shape[2] / 10)))
         )
