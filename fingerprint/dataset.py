@@ -88,10 +88,11 @@ class FingerprintDataset(Dataset):
 
 
 class FingerprintDataModule(pl.LightningDataModule):
-    def __init__(self, dataset, batch_size):
+    def __init__(self, dataset, batch_size, num_workers):
         super().__init__()
         self.dataset = dataset
         self.batch_size = batch_size
+        self.num_workers = num_workers
 
     def setup(self, stage=None):
         train_split = int(len(self.dataset) * 0.75)
@@ -102,15 +103,24 @@ class FingerprintDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.train_dataset, batch_size=self.batch_size, shuffle=True
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.val_dataset, batch_size=self.batch_size, shuffle=False
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(
-            self.val_dataset, batch_size=self.batch_size, shuffle=False
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
         )
