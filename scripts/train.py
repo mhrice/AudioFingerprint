@@ -3,6 +3,7 @@ from fingerprint.dataset import FingerprintDataModule, FingerprintDataset
 from fingerprint.model import FingerprinterModel
 from pytorch_lightning.loggers import WandbLogger
 import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 def main():
@@ -13,8 +14,13 @@ def main():
     torch.set_float32_matmul_precision("medium")
     data = FingerprintDataModule(dataset, batch_size, num_workers=2)
     model = FingerprinterModel()
+    checkpoint_callback = ModelCheckpoint(
+        dirpath="./ckpts", save_top_k=1, monitor="val_loss"
+    )
     wandb_logger = WandbLogger(project="Fingerprint", entity="mattricesound")
-    trainer = pl.Trainer(max_epochs=100, accelerator="gpu", logger=wandb_logger)
+    trainer = pl.Trainer(
+        max_epochs=200, accelerator="gpu", logger=wandb_logger, log_every_n_steps=1
+    )
     trainer.fit(model, data)
 
 

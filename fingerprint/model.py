@@ -41,7 +41,6 @@ class FingerprinterModel(pl.LightningModule):
             z.append(z_rep[i])
         z = torch.stack(z, dim=0)
         loss = similarity_loss(z, 0.05)
-        print("loss: ", loss)
         self.log(f"{mode}_loss", loss)
         return loss
 
