@@ -4,3 +4,7 @@ data
 __pycache__
 env
 .DS_Store
+*.pickle
+*.ckpt
+lightning_logs
+wandb

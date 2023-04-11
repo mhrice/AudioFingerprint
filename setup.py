@@ -1,7 +1,7 @@
 from pathlib import Path
 from setuptools import setup, find_packages
 
-NAME = "REMFX"
+NAME = "Fingerprint"
 DESCRIPTION = ""
 URL = ""
 EMAIL = "m.rice@se22.qmul.ac.uk"

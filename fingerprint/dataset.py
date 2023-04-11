@@ -9,13 +9,11 @@ import torch.nn.functional as F
 sample_rate = 8000
 chunk_size = int(1.2 * sample_rate)
 clipped_chunk_size = int(1.0 * sample_rate)
-length = 30
 chunk_overlap = 0.5
-chunks_per_song = int(length // chunk_overlap)
 
 
 class FingerprintDataset(Dataset):
-    def __init__(self, data_dir, noise_dir, ir_dir, batch_size, anchors_per_batch=8):
+    def __init__(self, data_dir, noise_dir, ir_dir, length):
         super().__init__()
         self.root = Path(data_dir)
         self.files = list(self.root.glob("*.wav"))
@@ -28,13 +26,14 @@ class FingerprintDataset(Dataset):
         self.mel = torchaudio.transforms.MelSpectrogram(
             sample_rate=sample_rate, n_fft=1024, hop_length=256, n_mels=256
         )
+        self.chunks_per_song = int(length // chunk_overlap)
 
     def __len__(self):
-        return len(self.files) * chunks_per_song
+        return len(self.files) * self.chunks_per_song
 
     def __getitem__(self, idx):
-        song_id = int(idx // (chunks_per_song))
-        chunk_id = int(idx % (chunks_per_song))
+        song_id = int(idx // (self.chunks_per_song))
+        chunk_id = int(idx % (self.chunks_per_song))
         data, sr = torchaudio.load(self.files[song_id])
         data = torchaudio.functional.resample(data, sr, sample_rate)
         start = int(chunk_id * chunk_overlap * sample_rate)
@@ -84,7 +83,8 @@ class FingerprintDataset(Dataset):
         msk_x = torch.randint(0, X_rep.shape[1] - msk.shape[0], (1,))
         msk_y = torch.randint(0, X_rep.shape[2] - msk.shape[1], (1,))
         X_rep[:, msk_x : msk_x + msk.shape[0], msk_y : msk_y + msk.shape[1]] = msk
-        return X_org, X_rep
+        label = self.files[song_id].stem
+        return X_org, X_rep, label
 
 
 class FingerprintDataModule(pl.LightningDataModule):

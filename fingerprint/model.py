@@ -32,7 +32,7 @@ class FingerprinterModel(pl.LightningModule):
         return z_orig, z_rep
 
     def common_step(self, batch, batch_idx, mode="train"):
-        orig, rep = batch
+        orig, rep, _ = batch
         z_orig, z_rep = self.forward(orig, rep)
         # Interleave the two vectors
         z = []
@@ -87,7 +87,6 @@ class FingerprinterProjection(nn.Module):
         self.conv1 = nn.Conv1d(h, dim * u, (1,), groups=dim)
         self.elu = nn.ELU()
         self.conv2 = nn.Conv1d(dim * u, dim, (1,), groups=dim)
-        self.split_size = h // dim
 
     def forward(self, x):
         x = x.unsqueeze(-1)
@@ -131,6 +130,7 @@ class SpatiallySeparableConvBlock(nn.Module):
 
 
 class ContrastiveLoss(nn.Module):
+    # From https://github.com/stdio2016/pfann
     def __init__(self, temperature=0.05):
         super().__init__()
         self.temperature = temperature
@@ -146,29 +146,3 @@ class ContrastiveLoss(nn.Module):
         loss_target = torch.zeros(logits.shape[0], dtype=torch.long)
         batch_loss = F.cross_entropy(logits, loss_target)
         return batch_loss
-
-    # def forward(self, z):
-    # a = torch.mm(z, z.T)
-    # a = a / self.temperature
-    # l = -torch.log(torch.exp(a).sum(dim=1) / a.shape[1])
-    # num_pairs = int(z.shape[0] / 2)
-    # l = []
-    # for i in range(0, num_pairs, 2):
-    #     p1 = z[i]
-    #     p2 = z[i + 1]
-    #     a = torch.mm(p1.view(1, -1), p2.view(-1, 1))
-    #     a = a / self.temperature
-    #     num = torch.exp(a)
-    #     # g = a.fill_diagonal_(0)
-    #     # denom = torch.exp(g).sum(dim=1)
-    #     denom = torch.exp(a) * z.shape[0] - 1
-    #     l.append(-torch.log(num / denom))
-    # # e = torch.exp(a)
-    # # numerator = e.sum(dim=1)
-    # # d_e = e.fill_diagonal_(0)
-    # # denominator = d_e.sum(dim=1)
-    # # l = -torch.log(numerator / denominator)
-    # # loss = 0
-    # # for i in range(0, l.shape[0], 2):
-    # #     loss += l[i]
-    # return torch.sum(torch.stack(l)) / num_pairs
