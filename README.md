@@ -4,7 +4,10 @@ A simplified implementation of Neural Audio Fingerprint for High-Specific Audio 
 To obtain the data, run the following commands:
 ```mkdir data
 cd data
-wget https://collect.qmul.ac.uk/down?t=4HTGJ1LPL5MGNJHE/R8RCNHTCDNH8IID6NB9RK6O
+wget https://collect.qmul.ac.uk/down?t=5DSGJQ07VCPS2S4C/613IT8K160JFB9U6AILKEPO
+unzip down\?t\=5DSGJQ07VCPS2S4C%2F613IT8K160JFB9U6AILKEPO
+wget https://collect.qmul.ac.uk/down?t=65A2P9AQ9276OBA9/6L0T7NQ4ULSHHH13758JR6O
+unzip down\?t\=65A2P9AQ9276OBA9%2F6L0T7NQ4ULSHHH13758JR6O
 wget https://github.com/karoldvl/ESC-50/archive/master.zip
 wget https://mcdermottlab.mit.edu/Reverb/IRMAudio/Audio.zip
 
